@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# csharp
+# go
+# java
+# javascript
+# mips
+# python
+# ruby
+# rust
+# swift
+
+for t in csharp go java javascript mips python ruby rust swift
+do
+  TRACK_ID=$t bin/generate
+  TRACK_ID=$t bin/generate-each
+done

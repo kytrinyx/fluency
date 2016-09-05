@@ -1,0 +1,85 @@
+#!/usr/bin/env ruby
+
+track_id = ENV['TRACK_ID']
+if track_id.to_s.empty?
+  puts "USAGE: TRACK_ID=<track-id> ./bin/generate-each"
+  exit 1
+end
+
+require "trackler"
+
+class Trackler::Implementation
+  def track
+    @track||= Trackler.tracks[track_id]
+  end
+
+  def readme_title
+    "%s: %s" % [track.language, problem.name]
+  end
+
+  def readme_source
+    s = problem.source_markdown
+    if s.empty?
+      s << "# Source"
+    end
+
+    s << <<-md
+
+
+This exercise is from the [#{track.language}][#{track.id}] track on [Exercism][exercism]
+
+[exercism]: http://exercism.io
+[#{track.id}]: http://exercism.io/languages/#{track.id}
+    md
+  end
+
+  def track_hint
+    File.read(File.absolute_path("../../instructions/#{track_id}/single.md", __FILE__))
+  end
+
+  def incomplete_solutions_body
+    ""
+  end
+end
+
+track = Trackler.tracks[track_id]
+
+pwd = Dir.pwd
+root = File.absolute_path("../../repos", __FILE__)
+license = File.absolute_path("../../LICENSE", __FILE__)
+
+track.implementations.each do |implementation|
+  next if implementation.problem.slug == "hello-world"
+
+  Dir.chdir pwd
+
+  # create the directory if it doesn't exist
+  repo = "%s-%s" % [track_id, implementation.problem.slug]
+  dir = File.join(root, repo)
+  FileUtils.mkdir_p dir
+
+  FileUtils.cp license, dir
+
+  # test_file = implementation.files.select {|f| f =~ track.test_pattern}.first.first
+  File.open(File.join(dir, "README.md"), "w") do |f|
+    f.write implementation.readme #.gsub("{TEST_FILENAME}", test_file)
+  end
+
+  implementation.file_bundle.paths.each do |path|
+    FileUtils.cp path, dir
+  end
+
+  # do the git stuff
+
+  Dir.chdir dir
+
+  is_git_repo = system("git rev-parse 2> /dev/null; [ $? == 0 ]")
+  if is_git_repo
+    system("git add . && git commit -m 'Update exercises'")
+  else
+    system("git init && git add README.md && git commit -m 'Add README' && git add . && git commit -m 'Add exercises'")
+    system("hub create fluency-in/%s" % repo)
+  end
+
+  system("git push -u origin master")
+end

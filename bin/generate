@@ -1,0 +1,110 @@
+#!/usr/bin/env ruby
+
+track_id = ENV['TRACK_ID']
+if track_id.to_s.empty?
+  puts "USAGE: TRACK_ID=<track-id> ./bin/generate"
+  exit 1
+end
+
+require "trackler"
+
+class Trackler::Implementation
+  def track_hint
+    ""
+  end
+
+  def incomplete_solutions_body
+    ""
+  end
+end
+
+class CollectionReadme
+  attr_reader :track
+  def initialize(track)
+    @track = track
+  end
+
+  def to_s
+    s = File.read(File.absolute_path("../instructions/README.md", __FILE__))
+    s = s.gsub("{LANGUAGE}", track.language)
+    s = s.gsub("{TRACK_ID}", track.id)
+    s = s.gsub("{INSTRUCTIONS}", instructions)
+    s = s.gsub("{RESOURCES}", resources)
+    s = s.gsub("{EXERCISE_LIST}", exercise_list)
+  end
+
+  private
+
+  def instructions
+    File.read(file("global.md"))
+  end
+
+  def resources
+    File.read(file("resources.md"))
+  end
+
+  def file(name)
+    File.absolute_path("../instructions/#{track.id}/#{name}", __FILE__)
+  end
+
+  def li(slug, blurb)
+    <<-md
+  **#{slug}**
+  #{blurb}
+    md
+  end
+
+  def exercise_list
+    track.problems.reject {|slug|
+      slug == "hello-world"
+    }.map {|slug|
+      Trackler.problems[slug]
+    }.map {|problem|
+      li(problem.slug, problem.blurb)
+    }.join("\n")
+  end
+end
+
+root = File.absolute_path("../../repos", __FILE__)
+license = File.absolute_path("../../LICENSE", __FILE__)
+
+# create the directory if it doesn't exist
+dir = File.join(root, track_id)
+FileUtils.mkdir_p dir
+
+# write the files...
+
+FileUtils.cp license, dir
+
+File.open(File.join(dir, "README.md"), "w") do |f|
+  f.write CollectionReadme.new(Trackler.tracks[track_id]).to_s
+end
+
+Trackler.tracks[track_id].implementations.each do |implementation|
+  next if implementation.problem.slug == "hello-world"
+
+  exercise_dir = File.join(dir, implementation.problem.slug)
+  FileUtils.mkdir_p exercise_dir
+
+  implementation.file_bundle.paths.each do |path|
+    FileUtils.cp path, exercise_dir
+  end
+
+  File.open(File.join(exercise_dir, "README.md"), "w") do |f|
+    f.write implementation.readme
+  end
+end
+
+# do the git stuff
+
+Dir.chdir dir
+
+is_git_repo = system("git rev-parse 2> /dev/null; [ $? == 0 ]")
+if is_git_repo
+  system("git add . && git commit -m 'Update exercises'")
+else
+  system("git init && git add README.md && git commit -m 'Add README' && git add . && git commit -m 'Add exercises'")
+  system("hub create fluency-in/%s" % track_id)
+end
+
+system("git push -u origin master")
