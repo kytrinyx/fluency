@@ -25,7 +25,7 @@ class CollectionReadme
   end
 
   def to_s
-    s = File.read(File.absolute_path("../instructions/README.md", __FILE__))
+    s = File.read(File.absolute_path("../../instructions/README.md", __FILE__))
     s = s.gsub("{LANGUAGE}", track.language)
     s = s.gsub("{TRACK_ID}", track.id)
     s = s.gsub("{INSTRUCTIONS}", instructions)
@@ -44,7 +44,7 @@ class CollectionReadme
   end
 
   def file(name)
-    File.absolute_path("../instructions/#{track.id}/#{name}", __FILE__)
+    File.absolute_path("../../instructions/#{track.id}/#{name}", __FILE__)
   end
 
   def li(slug, blurb)
@@ -55,10 +55,8 @@ class CollectionReadme
   end
 
   def exercise_list
-    track.problems.reject {|slug|
-      slug == "hello-world"
-    }.map {|slug|
-      Trackler.problems[slug]
+    track.problems.reject {|problem|
+      problem.slug == "hello-world"
     }.map {|problem|
       li(problem.slug, problem.blurb)
     }.join("\n")
